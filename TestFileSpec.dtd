@@ -1,0 +1,46 @@
+<!-- Common JTestSuite test file Specification -->
+<!-- Custom implementations should read/write test files to conform to this spec. --> 
+
+<!-- Generic test (root element) -->
+<!ELEMENT test (question*, pretext?, posttext?)>
+	<!-- Test name -->
+	<!ATTLIST test name CDATA #IMPLIED>
+	<!-- A date range to restrict taking the test to certain dates/times -->
+	<!-- Format: yyyymmddhhmmss-yyyymmddhhmmss. One bound can be specified as * to indicate lack thereof. -->
+	<!ATTLIST test range CDATA #IMPLIED>
+	
+	<!-- Generic question -->
+	<!ELEMENT question (title, query, body, attachment*)>
+		<!-- Question ID -->
+		<!ATTLIST question qid ID #REQUIRED>
+		<!-- Question type (see com.vetruvet.jtestsuite.shared.questions package for available types) -->
+		<!ATTLIST question type 
+			(SingleChoiceQuestion|MultipleChoiceQuestion|MatchingQuestion|
+			ShortTextQuestion|LongTextQuestion|DrawingQuestion) #REQUIRED>
+		<!-- Time allowed, in seconds, for answering the question (<=0 for unlimited) -->
+		<!ATTLIST question time CDATA #IMPLIED>
+	
+		<!-- Question name -->
+		<!ELEMENT title (#CDATA)>
+		
+		<!-- The question to be asked (e.g. "What color is the sky?") -->
+		<!ELEMENT query (#CDATA)>
+		
+		<!-- Body of the question (varies by question, parsed by question implementation) -->
+		<!ELEMENT body (#CDATA)>
+	
+		<!-- Generic attachment -->
+		<!ELEMENT attachment (#CDATA)>
+			<!-- Attachment ID -->
+			<!ATTLIST attachment aid ID #REQUIRED>
+			<!-- Attachment Name -->
+			<!ATTLIST attachment title CDATA #REQUIRED>
+			<!-- Attachment Type (see com.vetruvet.jtestsuite.shared.attachments package for available types) -->
+			<!ATTLIST attachment type (ImageAttachment|AudioAttachment|
+				VideoAttachment|PDFAttachment|TableAttachment) #REQUIRED>
+	
+	<!-- Text (with simple HTML) to display before starting the test -->
+	<!ELEMENT pretext (#CDATA)>
+	
+	<!-- Text (with simple HTML) to display after finishing the test -->
+	<!ELEMENT posttext (#CDATA)>
