@@ -141,15 +141,15 @@ public abstract class Question extends JPanel {
 		c.anchor = GridBagConstraints.CENTER;
 		
 		c.gridy = 0;
-		final JTextField idFld = new JTextField(15);
+		final JTextField idFld = new JTextField(id == null ? "new_question" : id, 15);
 		commonRoot.add(idFld, c);
 		
 		c.gridy = 1;
-		final JTextField titleFld = new JTextField(15);
+		final JTextField titleFld = new JTextField(title == null ? "New Question" : title, 15);
 		commonRoot.add(titleFld, c);
 		
 		c.gridy = 2;
-		final JTextArea queryFld = new JTextArea(5, 15);
+		final JTextArea queryFld = new JTextArea(qText == null ? "" : qText, 5, 15);
 		commonRoot.add(queryFld, c);
 		
 		JPanel typeOptsRoot = new JPanel();
@@ -159,7 +159,9 @@ public abstract class Question extends JPanel {
 		ActionListener commonApply = new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Save settings from inputs
+				setID(idFld.getText());
+				setTitle(titleFld.getText());
+				setQuestionText(queryFld.getText());
 			}
 		};
 		
