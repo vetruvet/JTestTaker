@@ -1,8 +1,9 @@
-<!-- Common JTestSuite test file Specification -->
-<!-- Custom implementations should read/write test files to conform to this spec. --> 
+<!-- Common JTestSuite test.xml file Specification -->
+<!-- Custom implementations should read/write test.xml files to conform to this spec. -->
+<!-- The test.xml file should be contained in the root of the .jtt ZIP file. --> 
 
 <!-- Generic test (root element) -->
-<!ELEMENT test (question*, pretext?, posttext?)>
+<!ELEMENT test (question*, attachment*, pretext?, posttext?)>
 	<!-- Test name -->
 	<!ATTLIST test name CDATA #IMPLIED>
 	<!-- A date range to restrict taking the test to certain dates/times -->
@@ -10,7 +11,7 @@
 	<!ATTLIST test range CDATA #IMPLIED>
 	
 	<!-- Generic question -->
-	<!ELEMENT question (title, query, body, attachment*)>
+	<!ELEMENT question (title, query, body, attach?)>
 		<!-- Question ID -->
 		<!ATTLIST question qid ID #REQUIRED>
 		<!-- Question type (see com.vetruvet.jtestsuite.shared.questions package for available types) -->
@@ -28,16 +29,22 @@
 		
 		<!-- Body of the question (varies by question, parsed by question implementation) -->
 		<!ELEMENT body (#CDATA)>
+		
+		<!-- References attachment nodes -->
+		<!ELEMENT attach (#CDATA)>
+			<!-- Contains the IDs of attachment nodes -->
+			<!ATTLIST attach ids IDREFS #REQUIRED>
 	
-		<!-- Generic attachment -->
-		<!ELEMENT attachment (#CDATA)>
-			<!-- Attachment ID -->
-			<!ATTLIST attachment aid ID #REQUIRED>
-			<!-- Attachment Name -->
-			<!ATTLIST attachment title CDATA #REQUIRED>
-			<!-- Attachment Type (see com.vetruvet.jtestsuite.shared.attachments package for available types) -->
-			<!ATTLIST attachment type (ImageAttachment|AudioAttachment|
-				VideoAttachment|PDFAttachment|TableAttachment) #REQUIRED>
+	<!-- Generic attachment -->
+	<!-- Attachments should be contained in the attachments directory in the .jtt ZIP file. -->
+	<!ELEMENT attachment (#CDATA)>
+		<!-- Attachment ID -->
+		<!ATTLIST attachment aid ID #REQUIRED>
+		<!-- Attachment Name -->
+		<!ATTLIST attachment title CDATA #REQUIRED>
+		<!-- Attachment Type (see com.vetruvet.jtestsuite.shared.attachments package for available types) -->
+		<!ATTLIST attachment type (ImageAttachment|AudioAttachment|
+			VideoAttachment|PDFAttachment|TableAttachment) #REQUIRED>
 	
 	<!-- Text (with simple HTML) to display before starting the test -->
 	<!ELEMENT pretext (#CDATA)>
