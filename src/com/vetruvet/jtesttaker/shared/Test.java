@@ -1,14 +1,27 @@
 package com.vetruvet.jtesttaker.shared;
-import java.io.BufferedWriter;
+
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerFactoryConfigurationError;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -26,13 +39,16 @@ import com.vetruvet.jtesttaker.shared.questions.MatchingQuestion;
 import com.vetruvet.jtesttaker.shared.questions.MultipleChoiceQuestion;
 import com.vetruvet.jtesttaker.shared.questions.Question;
 import com.vetruvet.jtesttaker.shared.questions.ShortTextQuestion;
-import com.vetruvet.jtesttaker.shared.questions.SingleChoiceQuestion;
 
 public class Test {
 	private ArrayList<Question> questions = new ArrayList<Question>();
+	private ArrayList<Attachment> attachments = new ArrayList<Attachment>();
+	
 	private String preText = null;
 	private String postText = null;
 	private String title = null;
+	
+	private File saveFile = null;
 	
 	public static Test readFromFile(String file) {
 		return readFromFile(new File(file));
@@ -44,7 +60,12 @@ public class Test {
 		try {
 			Test test = new Test();
 			
-			Document testDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file);
+			ZipFile zip = new ZipFile(file);
+			ZipEntry testEntry = zip.getEntry("test.xml");
+			if (testEntry == null) return null;
+			
+			Document testDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(
+					zip.getInputStream(testEntry));
 			testDoc.getDocumentElement().normalize();
 			
 			NodeList questionList = testDoc.getElementsByTagName("question");
@@ -60,10 +81,7 @@ public class Test {
 					type = typeNode.getNodeValue();
 				}
 				if (type == null) continue;
-				if (type.equals(SingleChoiceQuestion.class.getName())) {
-					quest = new SingleChoiceQuestion();
-				}
-				else if (type.equals(MultipleChoiceQuestion.class.getName())) {
+				if (type.equals(MultipleChoiceQuestion.class.getName())) {
 					quest = new MultipleChoiceQuestion();
 				}
 				else if (type.equals(MatchingQuestion.class.getName())) {
@@ -82,16 +100,12 @@ public class Test {
 				
 				String qid = null;
 				Node qidNode = attrs.getNamedItem("qid");
-				if (qidNode != null) {
-					qid = qidNode.getNodeValue();
-				}
+				if (qidNode != null) qid = qidNode.getNodeValue();
 				if (qid != null) quest.setID(qid);
 				
 				String time = null;
 				Node timeNode = attrs.getNamedItem("time");
-				if (timeNode != null) {
-					time = timeNode.getNodeValue();
-				}
+				if (timeNode != null) time = timeNode.getNodeValue();
 				if (time != null) {
 					try {
 						int timeVal = Integer.parseInt(time);
@@ -103,46 +117,13 @@ public class Test {
 				for (int w = 0; w < childList.getLength(); w++) {
 					Node childNode = childList.item(w);
 					String childName = childNode.getNodeName();
-					if (childName.equalsIgnoreCase("attachment")) {
-						Attachment att = null;
-						
-						NamedNodeMap attAttrs = childNode.getAttributes();
-						String attType = null;
-						Node attTypeNode = attAttrs.getNamedItem("type");
-						if (attTypeNode != null) {
-							attType = attTypeNode.getNodeValue();
+					if (childName.equalsIgnoreCase("attach")) {
+						Node attIDs = childNode.getAttributes().getNamedItem("ids");
+						String ids = null;
+						if (attIDs != null) ids = attIDs.getNodeValue();
+						if (ids != null) {
+							for (String id : ids.split(" ")) quest.addAttachment(id);
 						}
-						if (attType == null) continue;
-						if (attType.equals(ImageAttachment.class.getName())) {
-							att = new ImageAttachment();
-						}
-						else if (attType.equals(AudioAttachment.class.getName())) {
-							att = new AudioAttachment();
-						}
-						else if (attType.equals(VideoAttachment.class.getName())) {
-							att = new VideoAttachment();
-						}
-						else if (attType.equals(PDFAttachment.class.getName())) {
-							att = new PDFAttachment();
-						}
-						else if (attType.equals(TableAttachment.class.getName())) {
-							att = new TableAttachment();
-						}
-						else continue;
-						
-						String aid = null;
-						Node aidNode = attAttrs.getNamedItem("aid");
-						if (aidNode != null) {
-							aid = aidNode.getNodeValue();
-						}
-						if (aid != null) att.setID(aid);
-						
-						String attTitle = null;
-						Node titleNode = attAttrs.getNamedItem("title");
-						if (titleNode != null) {
-							attTitle = titleNode.getNodeValue();
-						}
-						if (attTitle != null) att.setTitle(attTitle);
 					}
 					else if (childName.equalsIgnoreCase("title")) {
 						quest.setTitle(childNode.getTextContent());
@@ -154,13 +135,60 @@ public class Test {
 						quest.parseBodyString(childNode.getTextContent());
 					}
 				}
+				
+				test.addQuestion(quest);
+			}
+			
+			NodeList attachList = testDoc.getElementsByTagName("attachment");
+			for (int q = 0; q < attachList.getLength(); q++) {
+				Node attachNode = attachList.item(q);
+				Attachment att = null;
+				
+				NamedNodeMap attAttrs = attachNode.getAttributes();
+				
+				String attType = null;
+				Node attTypeNode = attAttrs.getNamedItem("type");
+				if (attTypeNode != null) {
+					attType = attTypeNode.getNodeValue();
+				}
+				if (attType == null) continue;
+				if (attType.equals(ImageAttachment.class.getName())) {
+					att = new ImageAttachment();
+				}
+				else if (attType.equals(AudioAttachment.class.getName())) {
+					att = new AudioAttachment();
+				}
+				else if (attType.equals(VideoAttachment.class.getName())) {
+					att = new VideoAttachment();
+				}
+				else if (attType.equals(PDFAttachment.class.getName())) {
+					att = new PDFAttachment();
+				}
+				else if (attType.equals(TableAttachment.class.getName())) {
+					att = new TableAttachment();
+				}
+				else continue;
+				
+				String aid = null;
+				Node aidNode = attAttrs.getNamedItem("aid");
+				if (aidNode != null) {
+					aid = aidNode.getNodeValue();
+				}
+				if (aid != null) att.setID(aid);
+				
+				String attTitle = null;
+				Node titleNode = attAttrs.getNamedItem("title");
+				if (titleNode != null) {
+					attTitle = titleNode.getNodeValue();
+				}
+				if (attTitle != null) att.setTitle(attTitle);
 			}
 			
 			Node preTextNode = testDoc.getElementsByTagName("pretext").item(0);
-			test.setPreText(preTextNode.getTextContent());
+			if (preTextNode != null) test.setPreText(preTextNode.getTextContent());
 			
 			Node postTextNode = testDoc.getElementsByTagName("posttext").item(0);
-			test.setPostText(postTextNode.getTextContent());
+			if (postTextNode != null) test.setPostText(postTextNode.getTextContent());
 			
 			return test;
 		} catch (SAXException e) {
@@ -174,13 +202,67 @@ public class Test {
 			return null;
 		}
 	}
+
+	public Question getQuestion(int index) {
+		return questions.get(index);
+	}
+	
+	public Question getQuestion(String id) {
+		for (Question q : questions) {
+			if (q.getID().equals(id)) return q;
+		}
+		return null;
+	}
 	
 	public ArrayList<Question> getQuestions() {
 		return questions;
 	}
 	
-	public Question getQuestion(int index) {
-		return questions.get(index);
+	public int getNQuestions() {
+		return questions.size();
+	}
+	
+	public Attachment getAttachment(int index) {
+		return attachments.get(index);
+	}
+	
+	public Attachment getAttachment(String id) {
+		for (Attachment att : attachments) {
+			if (att.getID().equals(id)) return att;
+		}
+		return null;
+	}
+	
+	public ArrayList<Attachment> getAttachments() {
+		return attachments;
+	}
+	
+	public int getNAttachments() {
+		return attachments.size();
+	}
+	
+	public String getPreText() {
+		return preText;
+	}
+	
+	public String getPostText() {
+		return postText;
+	}
+	
+	public String getTitle() {
+		return title;
+	}
+	
+	public File getSaveFile() {
+		return saveFile;
+	}
+	
+	public void addQuestion(Question question) {
+		questions.add(question);
+	}
+
+	public void addAttachment(Attachment att) {
+		attachments.add(att);
 	}
 	
 	public void setQuestions(ArrayList<Question> questions) {
@@ -191,16 +273,32 @@ public class Test {
 		questions.set(index, question);
 	}
 	
-	public void addQuestion(Question question) {
-		questions.add(question);
+	public void setAttachments(ArrayList<Attachment> attachments) {
+		this.attachments = attachments;
+	}
+	
+	public void setAttachment(int index, Attachment att) {
+		attachments.set(index, att);
 	}
 	
 	public void removeQuestion(int index) {
 		questions.remove(index);
 	}
 	
-	public int getNQuestions() {
-		return questions.size();
+	public void removeQuestion(String id) {
+		for (Iterator<Question> it = questions.iterator(); it.hasNext(); ) {
+			if (it.next().getID().equals(id)) it.remove();
+		}
+	}
+	
+	public void removeAttachment(int index) {
+		attachments.remove(index);
+	}
+	
+	public void removeAttachment(String id) {
+		for (Iterator<Attachment> it = attachments.iterator(); it.hasNext(); ) {
+			if (it.next().getID().equals(id)) it.remove();
+		}
 	}
 	
 	public void setPreText(String text) {
@@ -215,69 +313,98 @@ public class Test {
 		this.title = title;
 	}
 	
+	public void setSaveFile(File file) {
+		saveFile = file;
+	}
+	
 	public void writeToFile(String file) {
 		writeToFile(new File(file));
 	}
 	
 	public void writeToFile(File file) {
-		BufferedWriter out = null;
 		try {
-			out = new BufferedWriter(new FileWriter(file));
+			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
 			
-			out.write("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
-			out.newLine();
-			
-			out.write("<test");
-			if (title != null && !title.isEmpty()) out.write(" name=\"" + title + "\"");
-			out.write(">");
-			out.newLine();
+			Element testRoot = doc.createElement("test");
+			if (title != null) testRoot.setAttribute("name", title);
+			doc.appendChild(testRoot);
 			
 			if (preText != null && !preText.isEmpty()) {
-				out.write("<pretext>");
-				out.newLine();
-				out.write(preText);
-				out.newLine();
-				out.write("</pretext>");
+				Element preTextElem = doc.createElement("pretext");
+				preTextElem.appendChild(doc.createTextNode(preText));
+				testRoot.appendChild(preTextElem);
 			}
 			
 			if (postText != null && !postText.isEmpty()) {
-				out.write("<posttext>");
-				out.newLine();
-				out.write(postText);
-				out.newLine();
-				out.write("</posttext>");
+				Element postTextElem = doc.createElement("posttext");
+				postTextElem.appendChild(doc.createTextNode(postText));
+				testRoot.appendChild(postTextElem);
 			}
 			
 			for (Question question : questions) {
-				out.write("<question qid=\"" + question.getID() + 
-						"\" type=\"" + question.getClass().getName() + "\"");
-				int qTime = question.getAllowedTime();
-				if (qTime > 0) out.write(" time=\"" + qTime + "\"");
-				out.write(">");
-				out.write("<title>" + question.getTitle() + "</title>");
-				out.write("<query>" + question.getQuestionText() + "</query>");
-				out.write("<body>" + question.getBodyString() + "</query>");
+				Element questElem = doc.createElement("question");
+				questElem.setAttribute("qid", question.getID());
+				questElem.setAttribute("type", question.getClass().getName());
+				if (question.getAllowedTime() > 0) 
+					questElem.setAttribute("time", question.getAllowedTime() + "");
+				testRoot.appendChild(questElem);
 				
-				for (Attachment att : question.getAttachments()) {
-					out.write("<attachment aid=\"" + att.getID() + "\" " +
-							"name=\"" + att.getTitle() + "\" " +
-							"type=\"" + att.getClass().getName() + "\">");
-					//TODO write attachment data (Base64 for small data or URI for large data)
-					out.write("</attachment>");
+				Element titleElem = doc.createElement("title");
+				titleElem.appendChild(doc.createTextNode(question.getTitle()));
+				questElem.appendChild(titleElem);
+				
+				Element queryElem = doc.createElement("query");
+				queryElem.appendChild(doc.createTextNode(question.getQuestionText()));
+				questElem.appendChild(queryElem);
+				
+				Element bodyElem = doc.createElement("body");
+				bodyElem.appendChild(doc.createTextNode(question.getBodyString()));
+				questElem.appendChild(bodyElem);
+				
+				String attIDs = "";
+				for (String att : question.getAttachments()) attIDs += att + " ";
+				if (!attIDs.isEmpty()) {
+					Element attElem = doc.createElement("attach");
+					attElem.setAttribute("ids", attIDs.substring(1, attIDs.length() - 1));
+					questElem.appendChild(attElem);
 				}
-				
-				out.write("</question>");
-				out.newLine();
 			}
-			out.write("</test>");
+			
+			for (Attachment att : attachments) {
+				Element attElem = doc.createElement("attachment");
+				attElem.setAttribute("aid", att.getID());
+				attElem.setAttribute("title", att.getTitle());
+				attElem.setAttribute("type", att.getClass().getName());
+				testRoot.appendChild(attElem);
+			}
+			
+			Transformer trans = TransformerFactory.newInstance().newTransformer();
+			trans.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+			trans.setOutputProperty(OutputKeys.INDENT, "yes");
+			
+			ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(file));
+			
+			zipOut.putNextEntry(new ZipEntry("test.xml"));
+			
+			DOMSource src = new DOMSource(doc);
+			StreamResult res = new StreamResult(zipOut);
+			trans.transform(src, res);
+			
+			zipOut.closeEntry();
+			
+			//TODO write attachments to ZIP
+			
+			zipOut.close();
+		} catch (ParserConfigurationException e) {
+			e.printStackTrace();
+		} catch (TransformerConfigurationException e) {
+			e.printStackTrace();
+		} catch (TransformerFactoryConfigurationError e) {
+			e.printStackTrace();
+		} catch (TransformerException e) {
+			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
-		} finally {
-			if (out != null) {
-				try {
-					out.close();
-				} catch (IOException e) { }
-			}
 		}
 	}
 }
