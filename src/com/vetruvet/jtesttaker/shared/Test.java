@@ -3,6 +3,8 @@ package com.vetruvet.jtesttaker.shared;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.zip.ZipEntry;
@@ -28,17 +30,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import com.vetruvet.jtesttaker.shared.attachments.Attachment;
-import com.vetruvet.jtesttaker.shared.attachments.AudioAttachment;
-import com.vetruvet.jtesttaker.shared.attachments.ImageAttachment;
-import com.vetruvet.jtesttaker.shared.attachments.PDFAttachment;
-import com.vetruvet.jtesttaker.shared.attachments.TableAttachment;
-import com.vetruvet.jtesttaker.shared.attachments.VideoAttachment;
-import com.vetruvet.jtesttaker.shared.questions.DrawingQuestion;
-import com.vetruvet.jtesttaker.shared.questions.LongTextQuestion;
-import com.vetruvet.jtesttaker.shared.questions.MatchingQuestion;
-import com.vetruvet.jtesttaker.shared.questions.MultipleChoiceQuestion;
 import com.vetruvet.jtesttaker.shared.questions.Question;
-import com.vetruvet.jtesttaker.shared.questions.ShortTextQuestion;
 
 public class Test {
 	private ArrayList<Question> questions = new ArrayList<Question>();
@@ -59,6 +51,7 @@ public class Test {
 		
 		try {
 			Test test = new Test();
+			test.setSaveFile(file);
 			
 			ZipFile zip = new ZipFile(file);
 			ZipEntry testEntry = zip.getEntry("test.xml");
@@ -68,11 +61,15 @@ public class Test {
 					zip.getInputStream(testEntry));
 			testDoc.getDocumentElement().normalize();
 			
+			NamedNodeMap testAttrs = testDoc.getElementsByTagName("test").item(0).getAttributes();
+			Node nameNode = testAttrs.getNamedItem("name");
+			String testName = null;
+			if (nameNode != null) testName = nameNode.getNodeValue();
+			if (testName != null) test.setTitle(testName);
+			
 			NodeList questionList = testDoc.getElementsByTagName("question");
 			for (int q = 0; q < questionList.getLength(); q++) {
 				Node questionNode = questionList.item(q);
-				Question quest = null;
-				
 				NamedNodeMap attrs = questionNode.getAttributes();
 
 				String type = null;
@@ -81,22 +78,7 @@ public class Test {
 					type = typeNode.getNodeValue();
 				}
 				if (type == null) continue;
-				if (type.equals(MultipleChoiceQuestion.class.getName())) {
-					quest = new MultipleChoiceQuestion();
-				}
-				else if (type.equals(MatchingQuestion.class.getName())) {
-					quest = new MatchingQuestion();
-				}
-				else if (type.equals(ShortTextQuestion.class.getName())) {
-					quest = new ShortTextQuestion();
-				}
-				else if (type.equals(LongTextQuestion.class.getName())) {
-					quest = new LongTextQuestion();
-				}
-				else if (type.equals(DrawingQuestion.class.getName())) {
-					quest = new DrawingQuestion();
-				}
-				else continue;
+				Question quest = (Question) Class.forName(type).newInstance();
 				
 				String qid = null;
 				Node qidNode = attrs.getNamedItem("qid");
@@ -142,39 +124,25 @@ public class Test {
 			NodeList attachList = testDoc.getElementsByTagName("attachment");
 			for (int q = 0; q < attachList.getLength(); q++) {
 				Node attachNode = attachList.item(q);
-				Attachment att = null;
-				
 				NamedNodeMap attAttrs = attachNode.getAttributes();
 				
-				String attType = null;
+				String type = null;
 				Node attTypeNode = attAttrs.getNamedItem("type");
 				if (attTypeNode != null) {
-					attType = attTypeNode.getNodeValue();
+					type = attTypeNode.getNodeValue();
 				}
-				if (attType == null) continue;
-				if (attType.equals(ImageAttachment.class.getName())) {
-					att = new ImageAttachment();
-				}
-				else if (attType.equals(AudioAttachment.class.getName())) {
-					att = new AudioAttachment();
-				}
-				else if (attType.equals(VideoAttachment.class.getName())) {
-					att = new VideoAttachment();
-				}
-				else if (attType.equals(PDFAttachment.class.getName())) {
-					att = new PDFAttachment();
-				}
-				else if (attType.equals(TableAttachment.class.getName())) {
-					att = new TableAttachment();
-				}
-				else continue;
+				if (type == null) continue;
+				Attachment att = (Attachment) Class.forName(type).newInstance();
 				
 				String aid = null;
 				Node aidNode = attAttrs.getNamedItem("aid");
 				if (aidNode != null) {
 					aid = aidNode.getNodeValue();
 				}
-				if (aid != null) att.setID(aid);
+				if (aid != null) {
+					att.setID(aid);
+					att.setURL(new URL("jar:file:" + file.getCanonicalPath() + "!/attachments/" + aid));
+				}
 				
 				String attTitle = null;
 				Node titleNode = attAttrs.getNamedItem("title");
@@ -193,14 +161,18 @@ public class Test {
 			return test;
 		} catch (SAXException e) {
 			e.printStackTrace();
-			return null;
 		} catch (IOException e) {
 			e.printStackTrace();
-			return null;
 		} catch (ParserConfigurationException e) {
 			e.printStackTrace();
-			return null;
+		} catch (InstantiationException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
 		}
+		return null;
 	}
 
 	public Question getQuestion(int index) {
@@ -261,7 +233,8 @@ public class Test {
 		questions.add(question);
 	}
 
-	public void addAttachment(Attachment att) {
+	public void addAttachment(Attachment att, URL srcUrl) {
+		att.setURL(srcUrl);
 		attachments.add(att);
 	}
 	
@@ -382,6 +355,13 @@ public class Test {
 			trans.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
 			trans.setOutputProperty(OutputKeys.INDENT, "yes");
 			
+			File tempFile = null;
+			if (saveFile != null) {
+				tempFile = File.createTempFile(saveFile.getName(), null);
+				tempFile.delete();
+				saveFile.renameTo(tempFile);
+			}
+			
 			ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(file));
 			
 			zipOut.putNextEntry(new ZipEntry("test.xml"));
@@ -392,7 +372,28 @@ public class Test {
 			
 			zipOut.closeEntry();
 			
-			//TODO write attachments to ZIP
+			ZipFile tempIn = (tempFile == null) ? null : new ZipFile(tempFile);
+			
+			for (Attachment att : attachments) {
+				ZipEntry attEntry = new ZipEntry("attachments/" + att.getID());
+				InputStream attIn = att.getURL().toExternalForm().startsWith("jar:file:") ? 
+						(tempIn != null ? tempIn.getInputStream(attEntry) : null) :
+							att.getURL().openStream();
+				
+				if (attIn == null) continue;
+				zipOut.putNextEntry(attEntry);
+				
+				int nRead = -1;
+				byte[] buf = new byte[4096];
+				while ((nRead = attIn.read(buf)) != -1) {
+					zipOut.write(buf, 0, nRead);
+				}
+				attIn.close();
+				
+				zipOut.closeEntry();
+			}
+			
+			if (tempFile != null) tempFile.delete();
 			
 			zipOut.close();
 		} catch (ParserConfigurationException e) {
