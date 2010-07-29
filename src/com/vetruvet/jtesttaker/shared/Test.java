@@ -49,11 +49,12 @@ public class Test {
 	public static Test readFromFile(File file) {
 		if (!file.exists()) return null;
 		
+		ZipFile zip = null;
 		try {
 			Test test = new Test();
 			test.setSaveFile(file);
 			
-			ZipFile zip = new ZipFile(file);
+			zip = new ZipFile(file);
 			ZipEntry testEntry = zip.getEntry("test.xml");
 			if (testEntry == null) return null;
 			
@@ -118,7 +119,7 @@ public class Test {
 					}
 				}
 				
-				test.addQuestion(quest);
+				test.questions.add(quest);
 			}
 			
 			NodeList attachList = testDoc.getElementsByTagName("attachment");
@@ -150,6 +151,8 @@ public class Test {
 					attTitle = titleNode.getNodeValue();
 				}
 				if (attTitle != null) att.setTitle(attTitle);
+				
+				test.attachments.add(att);
 			}
 			
 			Node preTextNode = testDoc.getElementsByTagName("pretext").item(0);
@@ -171,6 +174,10 @@ public class Test {
 			e.printStackTrace();
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
+		} finally {
+			if (zip != null) {
+				try { zip.close(); } catch (IOException e) { }
+			}
 		}
 		return null;
 	}
@@ -295,6 +302,11 @@ public class Test {
 	}
 	
 	public void writeToFile(File file) {
+		setSaveFile(file);
+		
+		ZipOutputStream zipOut = null;
+		ZipFile tempIn = null;
+		File tempFile = null;
 		try {
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
 			
@@ -338,7 +350,7 @@ public class Test {
 				for (String att : question.getAttachments()) attIDs += att + " ";
 				if (!attIDs.isEmpty()) {
 					Element attElem = doc.createElement("attach");
-					attElem.setAttribute("ids", attIDs.substring(1, attIDs.length() - 1));
+					attElem.setAttribute("ids", attIDs.substring(0, attIDs.length() - 1));
 					questElem.appendChild(attElem);
 				}
 			}
@@ -355,14 +367,12 @@ public class Test {
 			trans.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
 			trans.setOutputProperty(OutputKeys.INDENT, "yes");
 			
-			File tempFile = null;
 			if (saveFile != null) {
-				tempFile = File.createTempFile(saveFile.getName(), null);
-				tempFile.delete();
+				tempFile = new File(saveFile.getAbsolutePath() + System.currentTimeMillis() + ".tmp~");
 				saveFile.renameTo(tempFile);
 			}
 			
-			ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(file));
+			zipOut = new ZipOutputStream(new FileOutputStream(file));
 			
 			zipOut.putNextEntry(new ZipEntry("test.xml"));
 			
@@ -372,13 +382,14 @@ public class Test {
 			
 			zipOut.closeEntry();
 			
-			ZipFile tempIn = (tempFile == null) ? null : new ZipFile(tempFile);
+			if (tempFile != null) tempIn = new ZipFile(tempFile);
 			
 			for (Attachment att : attachments) {
 				ZipEntry attEntry = new ZipEntry("attachments/" + att.getID());
-				InputStream attIn = att.getURL().toExternalForm().startsWith("jar:file:") ? 
-						(tempIn != null ? tempIn.getInputStream(attEntry) : null) :
-							att.getURL().openStream();
+				
+				InputStream attIn = !att.getURL().toExternalForm().startsWith("jar:file:") ? 
+						att.getURL().openStream() : (tempIn == null ? null :
+							tempIn.getInputStream(tempIn.getEntry("attachments/" + att.getID())));
 				
 				if (attIn == null) continue;
 				zipOut.putNextEntry(attEntry);
@@ -391,11 +402,8 @@ public class Test {
 				attIn.close();
 				
 				zipOut.closeEntry();
+				att.setURL(new URL("jar:file:" + file.getCanonicalPath() + "!/attachments/" + att.getID()));
 			}
-			
-			if (tempFile != null) tempFile.delete();
-			
-			zipOut.close();
 		} catch (ParserConfigurationException e) {
 			e.printStackTrace();
 		} catch (TransformerConfigurationException e) {
@@ -406,6 +414,10 @@ public class Test {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
+		} finally {
+			if (tempIn != null) try { tempIn.close(); } catch (IOException e) { }
+			if (zipOut != null) try { zipOut.close(); } catch (IOException e) { }
+			if (tempFile != null && tempFile.exists() && !tempFile.delete()) tempFile.deleteOnExit();
 		}
 	}
 }
