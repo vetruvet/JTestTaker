@@ -236,6 +236,16 @@ public class Test {
 		return saveFile;
 	}
 	
+	public boolean isIDUsed(String id) {
+		for (Question quest : questions) {
+			if (quest.getID().equals(id)) return true;
+		}
+		for (Attachment att : attachments) {
+			if (att.getID().equals(id)) return true;
+		}
+		return false;
+	}
+	
 	public void addQuestion(Question question) {
 		questions.add(question);
 	}
@@ -272,13 +282,18 @@ public class Test {
 	}
 	
 	public void removeAttachment(int index) {
-		attachments.remove(index);
+		removeAttachFromQuestions(attachments.remove(index).getID());
 	}
 	
 	public void removeAttachment(String id) {
 		for (Iterator<Attachment> it = attachments.iterator(); it.hasNext(); ) {
 			if (it.next().getID().equals(id)) it.remove();
 		}
+		removeAttachFromQuestions(id);
+	}
+	
+	public void removeAttachFromQuestions(String id) {
+		for (Question quest : questions) quest.removeAttachment(id);
 	}
 	
 	public void setPreText(String text) {
