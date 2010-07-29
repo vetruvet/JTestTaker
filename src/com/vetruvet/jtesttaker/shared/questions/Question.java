@@ -8,15 +8,18 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 
 public abstract class Question extends JPanel {
 	private static final long serialVersionUID = -2903143552848826449L;
@@ -200,6 +203,14 @@ public abstract class Question extends JPanel {
 		applyButton.addActionListener(typeApply);
 		applyButton.addActionListener(commonApply);
 		butPanel.add(applyButton);
+		
+		optsDlg.getRootPane().registerKeyboardAction(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				optsDlg.setVisible(false);
+				optsDlg.dispose();
+			}
+		}, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
 		
 		optsDlg.setContentPane(optionsRoot);
 		optsDlg.pack();
