@@ -2,8 +2,10 @@ package com.vetruvet.jtesttaker.shared.questions;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.FlowLayout;
+import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -16,12 +18,15 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
-import com.vetruvet.jtesttaker.shared.attachments.Attachment;
-
 public abstract class Question extends JPanel {
 	private static final long serialVersionUID = -2903143552848826449L;
 	
-	private ArrayList<Attachment> attachments = new ArrayList<Attachment>();
+	protected static final String[] NUMBER_STYLES = new String[] {
+		"[None]", "A B C", "1 2 3", 
+		"a b c", "I II III", "i ii ii"
+	};
+	
+	private ArrayList<String> attachIDs = new ArrayList<String>();
 	
 	private String id = null;
 	private String title = null;
@@ -58,6 +63,30 @@ public abstract class Question extends JPanel {
 		return time;
 	}
 	
+	public String getAttachID(int index) {
+		return attachIDs.get(index);
+	}
+	
+	public String[] getAttachments() {
+		return attachIDs.toArray(new String[0]);
+	}
+	
+	public void addAttachment(String id) {
+		attachIDs.add(id);
+	}
+	
+	public void insertAttachment(String id, int index) {
+		attachIDs.add(index, id);
+	}
+	
+	public void removeAttachment(String id) {
+		attachIDs.remove(id);
+	}
+	
+	public void removeAttachment(int index) {
+		attachIDs.remove(index);
+	}
+	
 	public void setID(String id) {
 		this.id = id;
 	}
@@ -74,44 +103,15 @@ public abstract class Question extends JPanel {
 		this.time = time;
 	}
 	
-	public int addAttachment(Attachment att) {
-		attachments.add(att);
-		return attachments.size() - 1;
-	}
-	
-	public Attachment[] getAttachments() {
-		return attachments.toArray(new Attachment[0]);
-	}
-	
-	public Attachment getAttachment(int index) {
-		return attachments.get(index);
-	}
-	
-	public Attachment getAttachment(String id) {
-		for (Attachment att : attachments) {
-			if (att.getID().equals(id)) return att;
-		}
-		return null;
-	}
-	
-	public void removeAttachment(int index) {
-		attachments.set(index, null);
-	}
-	
-	public void removeAttachment(String id) {
-		for (int q = 0; q < attachments.size(); q++) {
-			if (attachments.get(q).getID().equals(id)) {
-				attachments.set(q, null);
-				break;
-			}
-		}
+	@Override
+	public String toString() {
+		return (id + " (" + title + ")");
 	}
 	
 	public void showOptionsDialog(Component parent) {
-		final JDialog optsDlg = new JDialog();
-		optsDlg.setModal(true);
+		final JDialog optsDlg = new JDialog((Frame) null, id == null ? "New Question" : "Editing Question", true);
 		
-		JPanel optionsRoot = new JPanel(new BorderLayout());
+		JPanel optionsRoot = new JPanel(new BorderLayout(3, 3));
 		
 		JPanel commonRoot = new JPanel(new GridBagLayout());
 		commonRoot.setBorder(BorderFactory.createTitledBorder(
@@ -120,6 +120,9 @@ public abstract class Question extends JPanel {
 		GridBagConstraints c = new GridBagConstraints();
 		
 		c.gridx = 0;
+		c.weightx = c.weighty = 0.0;
+		c.gridheight = c.gridwidth = 1;
+		c.insets = new Insets(3, 3, 2, 3);
 		c.anchor = GridBagConstraints.LINE_START;
 		
 		c.gridy = 0;
@@ -138,7 +141,8 @@ public abstract class Question extends JPanel {
 		commonRoot.add(queryLbl, c);
 		
 		c.gridx = 1;
-		c.anchor = GridBagConstraints.CENTER;
+		c.weightx = c.weighty = 1.0;
+		c.fill = GridBagConstraints.HORIZONTAL;
 		
 		c.gridy = 0;
 		final JTextField idFld = new JTextField(id == null ? "new_question" : id, 15);
@@ -169,6 +173,7 @@ public abstract class Question extends JPanel {
 		optionsRoot.add(butPanel, BorderLayout.PAGE_END);
 		
 		JButton okButton = new JButton("OK");
+		okButton.setDefaultCapable(true);
 		okButton.addActionListener(typeApply);
 		okButton.addActionListener(commonApply);
 		okButton.addActionListener(new ActionListener() {
@@ -178,6 +183,7 @@ public abstract class Question extends JPanel {
 				optsDlg.dispose();
 			}
 		});
+		optsDlg.getRootPane().setDefaultButton(okButton);
 		butPanel.add(okButton);
 		
 		JButton cancelButton = new JButton("Cancel");
