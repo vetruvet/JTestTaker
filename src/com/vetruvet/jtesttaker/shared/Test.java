@@ -1,5 +1,14 @@
 package com.vetruvet.jtesttaker.shared;
 
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.FlowLayout;
+import java.awt.Frame;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -11,6 +20,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
@@ -434,5 +449,129 @@ public class Test {
 			if (zipOut != null) try { zipOut.close(); } catch (IOException e) { }
 			if (tempFile != null && tempFile.exists() && !tempFile.delete()) tempFile.deleteOnExit();
 		}
+	}
+	
+	public void showOptionsDialog(Component parent) {
+		final JDialog optsDlg = new JDialog((Frame) null, "Editing Test", true);
+		
+		JPanel optionsRoot = new JPanel(new BorderLayout(3, 3));
+		
+		JPanel commonRoot = new JPanel(new GridBagLayout());
+		optionsRoot.add(commonRoot, BorderLayout.PAGE_START);
+		GridBagConstraints c = new GridBagConstraints();
+		
+		c.gridx = 0;
+		c.weightx = c.weighty = 0.0;
+		c.gridheight = c.gridwidth = 1;
+		c.insets = new Insets(3, 3, 2, 3);
+		c.anchor = GridBagConstraints.LINE_START;
+		
+		c.gridy = 0;
+		JLabel titleLbl = new JLabel("Test Title");
+		titleLbl.setToolTipText("A Name for the test");
+		commonRoot.add(titleLbl, c);
+		
+		c.gridy = 1;
+		JLabel preTextLbl = new JLabel("Introductory Text");
+		preTextLbl.setToolTipText("<html>This text will be shown prior to the first question.<br />" +
+				"Basic HTML is allowed.");
+		commonRoot.add(preTextLbl, c);
+		
+		c.gridy = 2;
+		JLabel postTextLbl = new JLabel("Concluding Text");
+		postTextLbl.setToolTipText("<html>This text will be shown after the last question.<br />" +
+				"Basic HTML is allowed.");
+		commonRoot.add(postTextLbl, c);
+		
+		c.gridy = 3;
+		JLabel dateStartLbl = new JLabel("Start date/time");
+		dateStartLbl.setEnabled(false);
+		dateStartLbl.setToolTipText("The test cannot be started before this date/time.");
+		commonRoot.add(dateStartLbl, c);
+		
+		c.gridy = 4;
+		JLabel dateEndLbl = new JLabel("End date/time");
+		dateEndLbl.setEnabled(false);
+		dateEndLbl.setToolTipText("The test cannot be started after this date/time.");
+		commonRoot.add(dateEndLbl, c);
+		
+		c.gridx = 1;
+		c.weightx = 1.0;
+		c.weighty = 0.0;
+		c.fill = GridBagConstraints.HORIZONTAL;
+		
+		c.gridy = 0;
+		final JTextField titleFld = new JTextField(title == null ? "New Test" : title, 15);
+		commonRoot.add(titleFld, c);
+		
+		c.gridy = 1;
+		c.weighty = 1.0;
+		c.fill = GridBagConstraints.BOTH;
+		final JTextArea preTextFld = new JTextArea(preText == null ? "" : preText, 5, 15);
+		commonRoot.add(preTextFld, c);
+		
+		c.gridy = 2;
+		final JTextArea postTextFld = new JTextArea(postText == null ? "" : postText, 5, 15);
+		commonRoot.add(postTextFld, c);
+		c.fill = GridBagConstraints.HORIZONTAL;
+		c.weighty = 0.0;
+		
+		c.gridy = 3;
+		final JTextField dateStartFld = new JTextField("");
+		dateStartFld.setEnabled(false);
+		commonRoot.add(dateStartFld, c);
+		
+		c.gridy = 4;
+		final JTextField dateEndFld = new JTextField("");
+		dateEndFld.setEnabled(false);
+		commonRoot.add(dateEndFld, c);
+		
+		JPanel typeOptsRoot = new JPanel();
+		optionsRoot.add(typeOptsRoot, BorderLayout.CENTER);
+		
+		ActionListener commonApply = new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				setTitle(titleFld.getText());
+				setPreText(preTextFld.getText());
+				setPostText(postTextFld.getText());
+			}
+		};
+		
+		JPanel butPanel = new JPanel(new FlowLayout());
+		optionsRoot.add(butPanel, BorderLayout.PAGE_END);
+		
+		JButton okButton = new JButton("OK");
+		okButton.setDefaultCapable(true);
+		okButton.addActionListener(commonApply);
+		okButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				optsDlg.setVisible(false);
+				optsDlg.dispose();
+			}
+		});
+		optsDlg.getRootPane().setDefaultButton(okButton);
+		butPanel.add(okButton);
+		
+		JButton cancelButton = new JButton("Cancel");
+		cancelButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				optsDlg.setVisible(false);
+				optsDlg.dispose();
+			}
+		});
+		butPanel.add(cancelButton);
+		
+		JButton applyButton = new JButton("Apply");
+		applyButton.addActionListener(commonApply);
+		butPanel.add(applyButton);
+		
+		optsDlg.setContentPane(optionsRoot);
+		optsDlg.pack();
+		optsDlg.setResizable(true);
+		optsDlg.setLocationRelativeTo(parent);
+		optsDlg.setVisible(true);
 	}
 }
